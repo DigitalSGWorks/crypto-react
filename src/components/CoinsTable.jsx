@@ -71,8 +71,8 @@ const CoinsTable = () => {
     // Remove SQL injection patterns
     sanitized = sanitized.replace(/['";\\]/g, '');
     
-    // Remove additional dangerous characters
-    sanitized = sanitized.replace(/[!><]/g, '');
+    // Remove additional dangerous characters (including ! > < .)
+    sanitized = sanitized.replace(/[!><\.]/g, '');
     
     // Remove JavaScript patterns
     sanitized = sanitized.replace(/javascript:|data:|vbscript:|on\w+\s*=/gi, '');
@@ -82,6 +82,21 @@ const CoinsTable = () => {
     
     // Remove common development patterns
     sanitized = sanitized.replace(/console\.|debugger|eval\(|Function\(/gi, '');
+    
+    // Remove XSS patterns
+    sanitized = sanitized.replace(/on\w+\s*=|javascript:|vbscript:|data:|<iframe|<object|<embed/gi, '');
+    
+    // Remove command injection patterns
+    sanitized = sanitized.replace(/[|&;`$(){}[\]]/g, '');
+    
+    // Remove directory traversal patterns
+    sanitized = sanitized.replace(/\.\.\/|\.\.\\|\/etc\/|\/var\/|\/tmp\/|C:\\|D:\\/gi, '');
+    
+    // Remove special characters that could be used for injection
+    sanitized = sanitized.replace(/[!@#$%^&*()_+\-=\[\]{};':"\\|,.<>\/?]/g, '');
+    
+    // Allow only letters, numbers, spaces, hyphens, and underscores
+    sanitized = sanitized.replace(/[^a-zA-Z0-9\s\-_]/g, '');
     
     // Limit length to prevent buffer overflow
     if (sanitized.length > 100) {
@@ -561,13 +576,14 @@ const CoinsTable = () => {
             variant="outlined"
             size="small"
             style={{ 
-              color: (currentPage === 0 || loading) ? 'rgba(255,255,255,0.3)' : 'white',
-              borderColor: (currentPage === 0 || loading) ? 'rgba(255,255,255,0.3)' : 'white',
-              minWidth: 'auto',
-              padding: '4px 8px'
+              color: (currentPage === 0 || loading) ? 'rgba(255,255,255,0.3)' : 'rgba(255,255,255,0.7)',
+              borderColor: (currentPage === 0 || loading) ? 'rgba(255,255,255,0.3)' : 'rgba(255,255,255,0.7)',
+              minWidth: '40px',
+              padding: '8px',
+              fontSize: '1.2rem'
             }}
           >
-            ← Previous
+            ←
           </Button>
           
           <Button 
@@ -576,13 +592,14 @@ const CoinsTable = () => {
             variant="outlined"
             size="small"
             style={{ 
-              color: (currentPage >= totalPages - 1 || loading) ? 'rgba(255,255,255,0.3)' : 'white',
-              borderColor: (currentPage >= totalPages - 1 || loading) ? 'rgba(255,255,255,0.3)' : 'white',
-              minWidth: 'auto',
-              padding: '4px 8px'
+              color: (currentPage >= totalPages - 1 || loading) ? 'rgba(255,255,255,0.3)' : 'rgba(255,255,255,0.7)',
+              borderColor: (currentPage >= totalPages - 1 || loading) ? 'rgba(255,255,255,0.3)' : 'rgba(255,255,255,0.7)',
+              minWidth: '40px',
+              padding: '8px',
+              fontSize: '1.2rem'
             }}
           >
-            Next →
+            →
           </Button>
         </Box>
       </Box>

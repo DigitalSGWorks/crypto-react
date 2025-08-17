@@ -35,11 +35,15 @@ export const useTrendingData = () => {
     try {
       setLoading(true);
       setError(null);
+      console.log('🔍 Loading trending data...');
       const data = await fetchTrendingData();
+      console.log('📊 Raw trending data:', data);
       // Extract the coins array from the API response
       const coinsData = data?.coins || [];
+      console.log('🪙 Extracted coins data:', coinsData);
       setTrendingData(coinsData);
     } catch (err) {
+      console.error('❌ Error loading trending data:', err);
       setError(err.message);
     } finally {
       setLoading(false);

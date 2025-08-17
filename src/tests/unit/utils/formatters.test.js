@@ -28,19 +28,24 @@ describe('Formatters', () => {
 
   describe('formatCurrency', () => {
     it('should format currency correctly', () => {
-      expect(formatCurrency(1000, 'USD')).toBe('$1,000.00');
-      expect(formatCurrency(1000, 'EUR')).toBe('€1,000.00');
+      expect(formatCurrency(1000, 'USD')).toBe('1,000.00$');
+      expect(formatCurrency(1000, 'EUR')).toBe('1,000.00€');
     });
 
     it('should handle null, undefined and NaN values', () => {
-      expect(formatCurrency(null, 'USD')).toBe('$0.00');
-      expect(formatCurrency(undefined, 'USD')).toBe('$0.00');
-      expect(formatCurrency(NaN, 'USD')).toBe('$0.00');
+      expect(formatCurrency(null, 'USD')).toBe('0$');
+      expect(formatCurrency(undefined, 'USD')).toBe('0$');
+      expect(formatCurrency(NaN, 'USD')).toBe('0$');
     });
 
     it('should handle different currencies', () => {
-      expect(formatCurrency(1000, 'GBP')).toBe('£1,000.00');
-      expect(formatCurrency(1000, 'JPY')).toBe('¥1,000.00');
+      expect(formatCurrency(1000, 'GBP')).toBe('1,000.00£');
+      expect(formatCurrency(1000, 'JPY')).toBe('1,000.00¥');
+    });
+
+    it('should format small values with 5 decimal places', () => {
+      expect(formatCurrency(0.12345, 'USD')).toBe('0.12345$');
+      expect(formatCurrency(0.5, 'USD')).toBe('0.50000$');
     });
   });
 
@@ -72,9 +77,9 @@ describe('Formatters', () => {
     });
 
     it('should handle null, undefined and NaN values', () => {
-      expect(formatMarketCap(null, 'USD')).toBe('$0.00');
-      expect(formatMarketCap(undefined, 'USD')).toBe('$0.00');
-      expect(formatMarketCap(NaN, 'USD')).toBe('$0.00');
+      expect(formatMarketCap(null, 'USD')).toBe('0$');
+      expect(formatMarketCap(undefined, 'USD')).toBe('0$');
+      expect(formatMarketCap(NaN, 'USD')).toBe('0$');
     });
 
     it('should handle small values', () => {

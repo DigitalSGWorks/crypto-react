@@ -329,8 +329,8 @@ const Coinspage = () => {
                             Price Evolution
                         </Typography>
                         <Box style={{ 
-                            height: '38vh', 
-                            minHeight: '270px',
+                            height: '45vh', 
+                            minHeight: '320px',
                             position: 'relative',
                             backgroundColor: 'rgba(255,255,255,0.02)',
                             borderRadius: '0.5vw',
@@ -375,8 +375,10 @@ const Coinspage = () => {
                                     borderColor: '#8b5cf6',
                                     color: days === button.value ? '#000000' : '#ffffff',
                                     backgroundColor: days === button.value ? '#ffffff' : 'transparent',
+                                    fontWeight: '600',
                                     '&:hover': {
                                         backgroundColor: days === button.value ? '#ffffff' : 'rgba(255, 255, 255, 0.1)',
+                                        color: days === button.value ? '#000000' : '#ffffff'
                                     }
                                 }}
                             >
@@ -545,8 +547,8 @@ const Coinspage = () => {
                                 Price Evolution
                             </Typography>
                             <Box style={{ 
-                                height: isTablet ? '38vh' : '48vh',
-                                minHeight: '320px',
+                                height: isTablet ? '45vh' : '55vh',
+                                minHeight: '380px',
                                 position: 'relative',
                                 marginBottom: '2vh'
                             }}>
@@ -589,8 +591,10 @@ const Coinspage = () => {
                                             backgroundColor: days === button.value ? '#ffffff' : 'transparent',
                                             minWidth: isTablet ? '60px' : '80px',
                                             fontSize: isTablet ? '0.8rem' : '1rem',
+                                            fontWeight: '600',
                                             '&:hover': {
                                                 backgroundColor: days === button.value ? '#ffffff' : 'rgba(255, 255, 255, 0.1)',
+                                                color: days === button.value ? '#000000' : '#ffffff'
                                             }
                                         }}
                                     >

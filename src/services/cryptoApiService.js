@@ -3,8 +3,9 @@ import { API_ENDPOINTS } from '../config/apiEndpoints';
 
 class CryptoApiService {
   constructor(baseURL = 'https://api.coingecko.com/api/v3') {
-    // Use local proxy first, then external CORS proxies as fallback
+    // Use external CORS proxies for production (Firebase Hosting)
     this.baseURL = baseURL;
+    this.isProduction = window.location.hostname !== 'localhost' && window.location.hostname !== '127.0.0.1';
     this.localProxyURL = '/api';
     this.corsProxyURLs = [
       'https://api.allorigins.win/raw?url=',
@@ -12,8 +13,8 @@ class CryptoApiService {
       'https://thingproxy.freeboard.io/fetch/'
     ];
     this.currentProxyIndex = 0;
-    this.useProxy = false;
-    this.proxyType = 'none'; // 'none', 'local', 'external'
+    this.useProxy = this.isProduction; // Use proxy by default in production
+    this.proxyType = this.isProduction ? 'external' : 'none'; // 'none', 'local', 'external'
     this.axiosInstance = axios.create({
       baseURL,
       timeout: 10000,
@@ -43,11 +44,16 @@ class CryptoApiService {
         await this.delay(1000); // 1 second delay between requests
       }
       
+      // In production, start with external proxy
+      if (this.isProduction && this.proxyType === 'external') {
+        this.axiosInstance.defaults.baseURL = this.corsProxyURLs[this.currentProxyIndex] + this.baseURL;
+      }
+      
       const response = await this.axiosInstance.get(endpoint, { params });
       return response.data;
     } catch (error) {
-      // Try local proxy first if direct request fails
-      if (!this.useProxy && (error.message.includes('CORS') || error.code === 'ERR_NETWORK')) {
+      // In development, try local proxy first if direct request fails
+      if (!this.isProduction && !this.useProxy && (error.message.includes('CORS') || error.code === 'ERR_NETWORK')) {
         console.warn('Direct API request failed, trying local proxy...');
         this.useProxy = true;
         this.proxyType = 'local';
@@ -55,20 +61,14 @@ class CryptoApiService {
         return this.makeRequest(endpoint, params, retryCount);
       }
       
-      // Try external CORS proxy if local proxy fails
-      if (this.useProxy && this.proxyType === 'local' && 
-          (error.response?.status === 403 || error.response?.status === 429 || error.code === 'ERR_NETWORK')) {
-        console.warn('Local proxy failed, trying external CORS proxy...');
+      // Try external CORS proxy if local proxy fails (development) or current proxy fails (production)
+      if ((!this.isProduction && this.useProxy && this.proxyType === 'local' && 
+           (error.response?.status === 403 || error.response?.status === 429 || error.code === 'ERR_NETWORK')) ||
+          (this.isProduction && this.proxyType === 'external' && 
+           (error.response?.status === 403 || error.response?.status === 429))) {
+        console.warn('Current proxy failed, trying next external CORS proxy...');
         this.proxyType = 'external';
-        this.axiosInstance.defaults.baseURL = this.corsProxyURLs[this.currentProxyIndex] + this.baseURL;
-        return this.makeRequest(endpoint, params, retryCount);
-      }
-      
-      // Try next external proxy if current external proxy failed
-      if (this.useProxy && this.proxyType === 'external' && this.currentProxyIndex < this.corsProxyURLs.length - 1 && 
-          (error.response?.status === 403 || error.response?.status === 429)) {
-        this.currentProxyIndex++;
-        console.warn(`External proxy ${this.currentProxyIndex - 1} failed, trying proxy ${this.currentProxyIndex}...`);
+        this.currentProxyIndex = (this.currentProxyIndex + 1) % this.corsProxyURLs.length;
         this.axiosInstance.defaults.baseURL = this.corsProxyURLs[this.currentProxyIndex] + this.baseURL;
         return this.makeRequest(endpoint, params, retryCount);
       }

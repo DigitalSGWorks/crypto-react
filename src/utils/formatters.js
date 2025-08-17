@@ -43,12 +43,7 @@ export const formatPercentage = (value, decimals = 2) => {
 
 export const formatMarketCap = (marketCap, currency = 'USD') => {
   if (marketCap === null || marketCap === undefined || isNaN(marketCap)) {
-    return new Intl.NumberFormat('en-US', {
-      style: 'currency',
-      currency: currency,
-      minimumFractionDigits: 2,
-      maximumFractionDigits: 2,
-    }).format(0);
+    return formatNumberWithCommas(0) + getCurrencySymbol(currency);
   }
   
   const billion = 1000000000;
