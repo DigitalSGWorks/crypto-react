@@ -45,7 +45,7 @@ const Header = () => {
               sx={{
                 flex: 1,
                 color: '#8b5cf6',
-                fontSize: '24px',
+                                 fontSize: { xs: '10px', sm: '14px', md: '24px' },
                 fontWeight: '700',
                 fontFamily: '"Orbitron", monospace',
                 cursor: 'pointer',
@@ -66,9 +66,9 @@ const Header = () => {
               data-testid="currency-select"
               variant='outlined' 
               sx={{
-                width: 120, 
-                height: 40, 
-                marginRight: 15,
+                                 width: { xs: 65, sm: 85, md: 120 }, 
+                 height: { xs: 24, sm: 30, md: 40 }, 
+                 marginRight: { xs: 5, sm: 7, md: 15 },
                 color: 'white',
                 '& .MuiOutlinedInput-notchedOutline': {
                   borderColor: '#8b5cf6',

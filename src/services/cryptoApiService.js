@@ -7,69 +7,175 @@ class CryptoApiService {
     this.baseURL = baseURL;
     this.isProduction = window.location.hostname !== 'localhost' && window.location.hostname !== '127.0.0.1';
     this.localProxyURL = '/api';
-    this.corsProxyURLs = [
-      'https://api.allorigins.win/raw?url=',
-      'https://corsproxy.io/?',
-      'https://thingproxy.freeboard.io/fetch/'
-    ];
+    
+    // Detect browsers for specific handling
+    this.isSafari = /^((?!chrome|android).)*safari/i.test(navigator.userAgent);
+    this.isChrome = /chrome/i.test(navigator.userAgent) && !/edge/i.test(navigator.userAgent);
+    this.isFirefox = /firefox/i.test(navigator.userAgent);
+    
+    console.log('Browser detected:', {
+      isSafari: this.isSafari,
+      isChrome: this.isChrome,
+      isFirefox: this.isFirefox,
+      userAgent: navigator.userAgent
+    });
+    
+         this.corsProxyURLs = [
+       'https://corsproxy.io/?',
+       'https://api.allorigins.win/raw?url=',
+       'https://thingproxy.freeboard.io/fetch/',
+       'https://cors-anywhere.herokuapp.com/'
+     ];
     this.currentProxyIndex = 0;
     this.useProxy = this.isProduction; // Use proxy by default in production
     this.proxyType = this.isProduction ? 'external' : 'none'; // 'none', 'local', 'external'
     this.axiosInstance = axios.create({
       baseURL,
-      timeout: 10000,
+      timeout: 20000, // Increased timeout for all browsers
       headers: {
         'Content-Type': 'application/json',
         'Accept': 'application/json',
-        'User-Agent': 'CryptoReact/1.0',
       },
     });
     
     // Rate limiting configuration based on CoinGecko documentation
     this.rateLimitConfig = {
-      maxRetries: 3,
-      baseDelay: 2000, // 2 seconds base delay
-      maxDelay: 30000, // 30 seconds max delay
-      retryStatusCodes: [429, 503], // Retry on rate limit and service unavailable
+      maxRetries: 5, // Increased retries
+      baseDelay: 1000, // Reduced base delay
+      maxDelay: 15000, // Reduced max delay
+      retryStatusCodes: [429, 503, 408, 500, 502, 504], // More retry status codes
     };
     
     this.requestQueue = [];
     this.isProcessingQueue = false;
   }
 
-  async makeRequest(endpoint, params = {}, retryCount = 0) {
+    async makeRequest(endpoint, params = {}, retryCount = 0) {
     try {
       // Add delay between requests to respect rate limits
       if (this.requestQueue.length > 0) {
         await this.delay(1000); // 1 second delay between requests
       }
       
-      // In production, start with external proxy
+      let url = endpoint;
+      
+      // Browser-specific handling
       if (this.isProduction && this.proxyType === 'external') {
-        this.axiosInstance.defaults.baseURL = this.corsProxyURLs[this.currentProxyIndex] + this.baseURL;
+        // Safari: Try direct request first, then proxy
+        if (this.isSafari) {
+          console.log('Safari detected, trying direct request first...');
+          try {
+            this.axiosInstance.defaults.baseURL = this.baseURL;
+            const response = await this.axiosInstance.get(endpoint, { params });
+            return response.data;
+          } catch (safariError) {
+            console.warn('Safari direct request failed, falling back to proxy...');
+          }
+        }
+        
+        // Chrome: Use simplified parameters to avoid 422 errors
+        if (this.isChrome) {
+          console.log('Chrome detected, using simplified parameters...');
+          const chromeParams = this.simplifyParamsForChrome(params);
+          try {
+            this.axiosInstance.defaults.baseURL = this.baseURL;
+            const response = await this.axiosInstance.get(endpoint, { params: chromeParams });
+            return response.data;
+          } catch (chromeError) {
+            console.warn('Chrome direct request failed, falling back to proxy...');
+          }
+        }
+        const proxyUrl = this.corsProxyURLs[this.currentProxyIndex];
+        // Construct the full URL properly with parameters
+        const fullUrl = this.baseURL + endpoint;
+        
+        // Simplified URL construction to avoid 422 errors
+        const paramString = Object.keys(params)
+          .filter(key => params[key] !== undefined && params[key] !== null)
+          .map(key => `${encodeURIComponent(key)}=${encodeURIComponent(String(params[key]))}`)
+          .join('&');
+        
+        const urlWithParams = fullUrl + (paramString ? `?${paramString}` : '');
+        url = proxyUrl + encodeURIComponent(urlWithParams);
+        // Reset baseURL for this request
+        this.axiosInstance.defaults.baseURL = '';
+      } else {
+        this.axiosInstance.defaults.baseURL = this.baseURL;
       }
       
-      const response = await this.axiosInstance.get(endpoint, { params });
+      const response = await this.axiosInstance.get(url);
+      
+      // Validate response data
+      if (!response.data) {
+        throw new Error('No data received from API');
+      }
+      
+      // Handle cases where proxy returns HTML instead of JSON
+      if (typeof response.data === 'string' && response.data.includes('<html>')) {
+        throw new Error('Proxy returned HTML instead of JSON data');
+      }
+      
       return response.data;
     } catch (error) {
+                   // Try next CORS proxy if current one fails
+       if (this.isProduction && this.proxyType === 'external' && 
+           (error.response?.status === 403 || error.response?.status === 429 || 
+            error.response?.status === 404 || error.response?.status === 422 ||
+            error.message.includes('CORS') || error.message.includes('HTML instead of JSON') || 
+            error.message.includes('No data received') || error.message.includes('Safari compatibility') ||
+            error.message.includes('market_chart') || error.message.includes('Market chart') ||
+            error.code === 'ERR_NETWORK' || error.code === 'ERR_CERT_DATE_INVALID' || 
+            error.code === 'ECONNABORTED')) {
+        
+        console.warn(`Proxy ${this.currentProxyIndex + 1} failed, trying next...`);
+        this.currentProxyIndex = (this.currentProxyIndex + 1) % this.corsProxyURLs.length;
+        
+                 // If we've tried all proxies, try direct request
+         if (this.currentProxyIndex === 0) {
+           console.warn('All proxies failed, trying direct request...');
+           this.proxyType = 'none';
+           this.axiosInstance.defaults.baseURL = this.baseURL;
+           // Reduced delay for faster fallback
+           await this.delay(1000);
+          
+                     // Try direct request with simplified parameters
+           try {
+             const simplifiedParams = { ...params };
+             // Remove potentially problematic parameters
+             delete simplifiedParams.sparkline;
+             delete simplifiedParams.locale;
+             
+                           // Special handling for market_chart endpoint
+              if (endpoint.includes('market_chart')) {
+                // More aggressive parameter simplification for market_chart
+                if (simplifiedParams.days > 90) {
+                  simplifiedParams.days = 180; // Try 6 months instead of 1 year
+                } else if (simplifiedParams.days > 30) {
+                  simplifiedParams.days = 60; // Try 2 months instead of 3 months
+                } else {
+                  simplifiedParams.days = Math.min(simplifiedParams.days || 1, 30);
+                }
+                console.log('Trying market_chart with simplified params:', simplifiedParams);
+              }
+             
+             const response = await this.axiosInstance.get(endpoint, { params: simplifiedParams });
+             return response.data;
+           } catch (directError) {
+             console.warn('Direct request also failed, throwing error');
+             this.handleApiError(directError);
+             throw directError;
+           }
+        }
+        
+        return this.makeRequest(endpoint, params, retryCount);
+      }
+      
       // In development, try local proxy first if direct request fails
       if (!this.isProduction && !this.useProxy && (error.message.includes('CORS') || error.code === 'ERR_NETWORK')) {
         console.warn('Direct API request failed, trying local proxy...');
         this.useProxy = true;
         this.proxyType = 'local';
         this.axiosInstance.defaults.baseURL = this.localProxyURL;
-        return this.makeRequest(endpoint, params, retryCount);
-      }
-      
-      // Try external CORS proxy if local proxy fails (development) or current proxy fails (production)
-      if ((!this.isProduction && this.useProxy && this.proxyType === 'local' && 
-           (error.response?.status === 403 || error.response?.status === 429 || error.code === 'ERR_NETWORK')) ||
-          (this.isProduction && this.proxyType === 'external' && 
-           (error.response?.status === 403 || error.response?.status === 429))) {
-        console.warn('Current proxy failed, trying next external CORS proxy...');
-        this.proxyType = 'external';
-        this.currentProxyIndex = (this.currentProxyIndex + 1) % this.corsProxyURLs.length;
-        this.axiosInstance.defaults.baseURL = this.corsProxyURLs[this.currentProxyIndex] + this.baseURL;
         return this.makeRequest(endpoint, params, retryCount);
       }
       
@@ -108,6 +214,34 @@ class CryptoApiService {
     return new Promise(resolve => setTimeout(resolve, ms));
   }
 
+  simplifyParamsForChrome(params) {
+    // Chrome-specific parameter simplification to avoid 422 errors
+    const simplified = { ...params };
+    
+    // Remove potentially problematic parameters for Chrome
+    delete simplified.sparkline;
+    delete simplified.locale;
+    
+    // For market_chart endpoint, limit days
+    if (simplified.days) {
+      if (simplified.days > 90) {
+        simplified.days = 180; // 6 months instead of 1 year
+      } else if (simplified.days > 30) {
+        simplified.days = 60; // 2 months instead of 3 months
+      } else {
+        simplified.days = Math.min(simplified.days, 30);
+      }
+    }
+    
+    // For coins/markets endpoint, limit per_page
+    if (simplified.per_page && simplified.per_page > 100) {
+      simplified.per_page = 100;
+    }
+    
+    console.log('Chrome simplified params:', simplified);
+    return simplified;
+  }
+
   resetProxy() {
     this.useProxy = false;
     this.proxyType = 'none';
@@ -117,10 +251,17 @@ class CryptoApiService {
 
   handleApiError(error) {
     // Handle CORS errors specifically
-    if (error.message && error.message.includes('CORS')) {
-      console.error('CORS error detected. This might be due to API restrictions or network issues.');
+    if (error.message && (error.message.includes('CORS') || error.message.includes('Network Error'))) {
+      console.error('CORS/Network error detected. This might be due to API restrictions or network issues.');
       console.error('CoinGecko API may have temporary restrictions. Please try again later.');
       throw new Error('CORS error: API access temporarily restricted. Please try again later.');
+    }
+    
+    // Handle 422 errors (Unprocessable Entity) - often Safari-specific issues
+    if (error.response?.status === 422) {
+      console.error('422 error detected. This might be due to Safari-specific request formatting issues.');
+      console.error('Attempting to retry with different parameters...');
+      throw new Error('Safari compatibility issue. Please try again.');
     }
     
     if (error.response?.status === 429) {
@@ -155,15 +296,41 @@ class CryptoApiService {
   }
 
   async fetchCryptoData(currency = 'USD', perPage = 250, page = 1) {
-    const params = {
-      vs_currency: currency,
-      order: 'market_cap_desc',
-      per_page: perPage,
-      page,
-      sparkline: false,
-      locale: 'en',
-    };
+    // Browser-specific parameters
+    let params;
+    
+    if (this.isChrome) {
+      // Chrome: Use simplified parameters to avoid 422 errors
+      params = {
+        vs_currency: currency,
+        order: 'market_cap_desc',
+        per_page: Math.min(perPage, 100), // Limit to 100 for Chrome
+        page,
+        // Remove sparkline and locale for Chrome
+      };
+    } else if (this.isSafari) {
+      // Safari: Use full parameters
+      params = {
+        vs_currency: currency,
+        order: 'market_cap_desc',
+        per_page: perPage,
+        page,
+        sparkline: false,
+        locale: 'en',
+      };
+    } else {
+      // Other browsers: Use standard parameters
+      params = {
+        vs_currency: currency,
+        order: 'market_cap_desc',
+        per_page: perPage,
+        page,
+        sparkline: false,
+        locale: 'en',
+      };
+    }
 
+    console.log(`Fetching crypto data for ${this.isChrome ? 'Chrome' : this.isSafari ? 'Safari' : 'Other'} with params:`, params);
     return this.makeRequest(API_ENDPOINTS.COINS_MARKETS, params);
   }
 
@@ -172,13 +339,77 @@ class CryptoApiService {
   }
 
   async fetchHistoricalData(coinId, days, currency = 'USD') {
-    const params = {
-      vs_currency: currency,
-      days,
-    };
-
     const endpoint = API_ENDPOINTS.COIN_MARKET_CHART.replace('{id}', coinId);
-    return this.makeRequest(endpoint, params);
+    
+    // Browser-specific parameters for historical data
+    let params;
+    
+    if (this.isChrome) {
+      // Chrome: Use more conservative parameters
+      let chromeDays = days;
+      if (days > 90) {
+        chromeDays = 180; // 6 months instead of 1 year
+      } else if (days > 30) {
+        chromeDays = 60; // 2 months instead of 3 months
+      } else {
+        chromeDays = Math.min(days, 30);
+      }
+      
+      params = {
+        vs_currency: currency,
+        days: chromeDays,
+      };
+      
+      console.log(`Chrome historical data: ${days} days → ${chromeDays} days`);
+    } else {
+      // Safari and other browsers: Use original parameters
+      params = {
+        vs_currency: currency,
+        days,
+      };
+    }
+    
+    // Special handling for market_chart endpoint which can be problematic with CORS
+    try {
+      return await this.makeRequest(endpoint, params);
+    } catch (error) {
+      console.warn('Market chart request failed, trying with simplified parameters...');
+      
+      // Try different fallback strategies based on the requested days
+      let fallbackDays = days;
+      
+      if (days > 90) {
+        // For 1 year (365 days), try 180 days first
+        fallbackDays = 180;
+        console.log('Trying fallback to 180 days for 1 year request');
+      } else if (days > 30) {
+        // For 3 months (90 days), try 60 days first
+        fallbackDays = 60;
+        console.log('Trying fallback to 60 days for 3 months request');
+      } else {
+        // For other cases, limit to 30 days
+        fallbackDays = Math.min(days, 30);
+        console.log('Trying fallback to 30 days max');
+      }
+      
+      const simplifiedParams = {
+        vs_currency: currency,
+        days: fallbackDays,
+      };
+      
+      try {
+        return await this.makeRequest(endpoint, simplifiedParams);
+      } catch (secondError) {
+        // If still failing, try with the most basic parameters
+        console.warn('Second attempt failed, trying with minimal parameters...');
+        const minimalParams = {
+          vs_currency: currency,
+          days: Math.min(days, 7), // Last resort: 7 days max
+        };
+        
+        return await this.makeRequest(endpoint, minimalParams);
+      }
+    }
   }
 
   async fetchCoinDetails(coinId) {

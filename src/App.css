@@ -6,12 +6,79 @@
 }
 
 body {
-  min-width: 650px;
-  overflow-x: auto;
+  width: 100%;
+  max-width: 100vw;
+  overflow-x: hidden;
 }
 
 #root {
-  min-width: 650px;
+  width: 100%;
+  max-width: 100vw;
+  overflow-x: hidden;
+}
+
+/* Safari mobile specific overrides */
+@supports (-webkit-touch-callout: none) {
+  #root {
+    width: 100vw !important;
+    max-width: 100vw !important;
+    overflow-x: hidden !important;
+  }
+  
+  /* Safari mobile typography overrides */
+  h1, h2, h3, h4, h5, h6 {
+    font-size: clamp(0.8rem, 3vw, 1.5rem) !important;
+  }
+  
+  .MuiTypography-root {
+    font-size: clamp(0.7rem, 2.5vw, 1rem) !important;
+  }
+  
+  @media screen and (max-width: 428px) {
+    #root {
+      width: 100vw !important;
+      max-width: 100vw !important;
+      overflow-x: hidden !important;
+    }
+    
+    /* Ultra-small fonts for Safari mobile */
+    h1 {
+      font-size: 1rem !important;
+    }
+    
+    h2 {
+      font-size: 0.9rem !important;
+    }
+    
+    h3 {
+      font-size: 0.8rem !important;
+    }
+    
+    .MuiTypography-root {
+      font-size: 0.7rem !important;
+    }
+    
+    /* Table specific fixes */
+    table {
+      font-size: 0.6rem !important;
+    }
+    
+    th, td {
+      font-size: 0.6rem !important;
+      padding: 3px 1px !important;
+    }
+    
+    /* Button and input fixes */
+    button {
+      font-size: 0.7rem !important;
+      padding: 4px 8px !important;
+    }
+    
+    input, select {
+      font-size: 0.7rem !important;
+      height: 28px !important;
+    }
+  }
 }
 
 a{

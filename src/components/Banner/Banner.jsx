@@ -1,4 +1,4 @@
-import { Container, Box, Typography } from '@mui/material'
+import { Container, Box, Typography, useTheme, useMediaQuery } from '@mui/material'
 import { styled } from '@mui/material/styles'
 import React from 'react'
 import Carousel from './Carousel'
@@ -10,11 +10,11 @@ const BannerContainer = styled(Box)(({ theme }) => ({
   backgroundRepeat: 'no-repeat'
 }))
 
-const BannerContent = styled(Container)(({ theme }) => ({
-  height: 400,
+const BannerContent = styled(Container)(({ theme, isMobile }) => ({
+  height: isMobile ? 300 : 400,
   display: 'flex',
   flexDirection: 'column',
-  paddingTop: 25,
+  paddingTop: isMobile ? 15 : 25,
   justifyContent: 'space-around'
 }))
 
@@ -27,17 +27,20 @@ const TaglineContainer = styled(Box)(({ theme }) => ({
 }))
 
 const Banner = () => {
+  const theme = useTheme();
+  const isMobile = useMediaQuery(theme.breakpoints.down('sm')); // Use mobile layout on screens below 600px (599px and below)
+  
   return (
     <BannerContainer>
-      <BannerContent>
+      <BannerContent isMobile={isMobile}>
         <TaglineContainer>
           <Typography
-            variant="h2"
+            variant={isMobile ? "h3" : "h2"}
             style={{
               fontWeight: "700",
-              marginBottom: 15,
+              marginBottom: isMobile ? 10 : 15,
               fontFamily: '"Orbitron", monospace',
-              fontSize: '3.5rem',
+                             fontSize: isMobile ? '0.8rem' : '3.5rem',
               color: 'white',
               letterSpacing: '2px',
               textTransform: 'uppercase',
@@ -52,10 +55,10 @@ const Banner = () => {
             Crypto Tracker
           </Typography>
           <Typography
-            variant="subtitle2"
+            variant={isMobile ? "body1" : "subtitle2"}
             style={{
               color: 'rgba(255, 255, 255, 0.8)',
-              fontSize: '1.2rem',
+                             fontSize: isMobile ? '0.4rem' : '1.2rem',
               fontWeight: '400',
               letterSpacing: '1px',
               textTransform: 'uppercase',
